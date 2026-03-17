@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบบันทึกการจับกุมตามหมายจับ - SSO Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
+    .gradient-bg { background: linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%); }
+    .card-shadow { box-shadow: 0 10px 40px rgba(220, 38, 38, 0.15); }
+    .btn-primary { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); transition: all 0.3s ease; }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(220, 38, 38, 0.4); }
+    .tab-active { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; }
+    .profile-img { width: 100px; height: 100px; border-radius: 50%; border: 4px solid #fff; object-fit: cover; margin: 0 auto 1.5rem; }
+  </style>
+</head>
+<body class="h-full bg-gray-50">
+  <div id="app" class="h-full w-full overflow-auto">
+    
+    <div id="loginPage" class="min-h-full flex items-center justify-center p-4 gradient-bg">
+      <div class="w-full max-w-md">
+        <div class="bg-white rounded-3xl card-shadow p-8 text-center">
+          <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">PISD6 SSO Portal</h1>
+            <p class="text-gray-500 text-sm">ระบบบันทึกการจับกุมตามหมายจับ</p>
+          </div>
+          
+          <div id="authFlow">
+            <p id="loadingText" class="text-red-600 font-semibold animate-pulse">กำลังโหลดข้อมูล LINE...</p>
+            <img id="profileImage" class="profile-img hidden shadow-xl" src="" alt="Profile">
+            <h3 id="displayName" class="text-xl font-bold text-gray-800"></h3>
+            <p id="userIdDisplay" class="text-xs text-gray-400 mb-6"></p>
+            
+            <div id="statusBox" class="hidden bg-gray-100 p-4 rounded-2xl text-left text-sm mb-4 border-l-4 border-red-600"></div>
+            <button id="btnRetry" class="hidden w-full btn-primary text-white font-semibold py-3 rounded-xl">ลองใหม่อีกครั้ง</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="mainApp" class="hidden min-h-full flex flex-col">
+      <header class="gradient-bg text-white shadow-lg no-print">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold">บันทึกการจับกุมตามหมายจับ</h1>
+              <p id="officerInfo" class="text-red-100 text-xs"></p>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <div class="bg-white border-b border-gray-200 shadow-sm no-print">
+        <div class="max-w-7xl mx-auto px-4 flex gap-2 py-3">
+          <button id="tabRecord" class="tab-btn tab-active px-6 py-2 rounded-xl font-medium flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>บันทึกข้อมูล</button>
+          <button id="tabDashboard" class="tab-btn bg-gray-100 px-6 py-2 rounded-xl font-medium flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Dashboard</button>
+        </div>
+      </div>
+      
+      <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+        <div id="recordSection" class="space-y-6">
+          <form id="arrestForm" class="space-y-6">
+            <div class="bg-white rounded-2xl card-shadow p-6 space-y-4">
+              <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0-2H5a2 2 0-2 2v12a2 2 0 002 2z"/></svg></span>ข้อมูลการจับกุม</h2>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">วันที่จับกุม *</label><input type="date" id="arrestDate" required class="w-full px-4 py-2 border rounded-xl outline-none focus:border-red-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">หน่วยที่จับกุม *</label>
+                  <select id="arrestUnit" required class="w-full px-4 py-2 border rounded-xl outline-none focus:border-red-500">
+                    <option value="กก.สืบสวน ภ.จว.พิษณุโลก">กก.สืบสวน ภ.จว.พิษณุโลก</option>
+                    <option value="สภ.เมืองพิษณุโลก">สภ.เมืองพิษณุโลก</option>
+                    <option value="อื่นๆ">อื่นๆ</option>
+                  </select>
+                </div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">สถานที่จับกุม *</label><input type="text" id="arrestLocation" required class="w-full px-4 py-2 border rounded-xl"></div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl card-shadow p-6 space-y-4">
+              <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></span>ข้อมูลหมายจับ</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">หมายจับของศาล *</label><input type="text" id="warrantCourt" required class="w-full px-4 py-2 border rounded-xl"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">เลขที่หมายจับ *</label><input type="text" id="warrantNumber" required class="w-full px-4 py-2 border rounded-xl"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">ประเภท *</label>
+                  <select id="warrantType" required class="w-full px-4 py-2 border rounded-xl">
+                    <option value="หมายจับใหม่">หมายจับใหม่</option>
+                    <option value="หมายจับเก่า">หมายจับเก่า</option>
+                    <option value="ข้อหาร้ายแรง">ข้อหาร้ายแรง</option>
+                  </select>
+                </div>
+                <div class="md:col-span-3"><label class="block text-xs font-bold text-gray-700 mb-1">ข้อหา *</label><input type="text" id="charge" required class="w-full px-4 py-2 border rounded-xl"></div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl card-shadow p-6 space-y-4">
+              <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><span class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center"><svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></span>ข้อมูลผู้ถูกจับ</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">ชื่อ *</label><input type="text" id="firstName" required class="w-full px-4 py-2 border rounded-xl"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">นามสกุล *</label><input type="text" id="lastName" required class="w-full px-4 py-2 border rounded-xl"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">อายุ *</label><input type="number" id="age" required class="w-full px-4 py-2 border rounded-xl"></div>
+              </div>
+            </div>
+
+            <div class="flex justify-center gap-4">
+              <button type="reset" class="px-8 py-3 bg-gray-200 rounded-xl font-bold">ล้างข้อมูล</button>
+              <button type="submit" id="submitBtn" class="btn-primary px-12 py-3 text-white rounded-xl font-bold">บันทึกข้อมูลการจับกุม</button>
+            </div>
+            <div id="formStatus" class="hidden p-4 rounded-xl text-center font-bold"></div>
+          </form>
+        </div>
+
+        <div id="dashboardSection" class="hidden space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="statsGrid"></div>
+          <div class="bg-white rounded-2xl card-shadow p-6">
+            <h3 class="font-bold mb-4">กราฟสถิติ</h3>
+            <div class="h-64"><canvas id="warrantTypeChart"></canvas></div>
+          </div>
+          <div class="bg-white rounded-2xl card-shadow p-6 overflow-x-auto">
+            <h3 class="font-bold mb-4">รายการล่าสุด</h3>
+            <table class="w-full text-sm text-left"><tbody id="recentRecordsTable"></tbody></table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div id="toast" class="fixed bottom-4 right-4 z-50 hidden p-4 rounded-xl text-white shadow-lg"></div>
+  </div>
+
+  <script>
+    (function() {
+      const CONFIG = {
+        LIFF_ID: "2009416313-DXQoMEIm",
+        SSO_API_URL: "https://script.google.com/macros/s/AKfycbwyI-KJlJzK1kKLkArN5aTgI5mefFJWbNXxvFG8jC011zn49lNAIkmm6BY1FMWYHuP6/exec",
+        DATA_API_URL: "https://script.google.com/macros/s/AKfycbw94pRu7JwSZ9OxIFGFIqNu_M8t64VSkw2i50aEtZRWEs8mIkD_vlHHsmiEq61uPYyG/exec",
+        APP_CODE: "pisdapp_00002"
+      };
+
+      let authorizedUser = null;
+      let pieChart = null;
+
+      const ApiStub = {
+        async sendRequest(url, action, payloadData) {
+          const payload = { action, payload: payloadData };
+          const response = await fetch(url, {
+            method: "POST",
+            body: JSON.stringify(payload),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+          });
+          return await response.json();
+        }
+      };
+
+      async function initSSO() {
+        const statusBox = document.getElementById("statusBox");
+        try {
+          statusBox.classList.remove("hidden");
+          statusBox.innerText = "กำลังตรวจสอบตัวตน LINE...";
+          await liff.init({ liffId: CONFIG.LIFF_ID });
+          if (!liff.isLoggedIn()) { liff.login(); return; }
+
+          const profile = await liff.getProfile();
+          document.getElementById("loadingText").classList.add("hidden");
+          document.getElementById("profileImage").src = profile.pictureUrl;
+          document.getElementById("profileImage").classList.remove("hidden");
+          document.getElementById("displayName").innerText = "สวัสดี, " + profile.displayName;
+          document.getElementById("userIdDisplay").innerText = profile.userId;
+
+          statusBox.innerText = "กำลังยืนยันสิทธิ์ SSO...";
+          const s1 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "liff_auth", { lineUserId: profile.userId });
+          if (s1.status !== 200) throw new Error(s1.message);
+
+          const s2 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "sso_auth", { lineUserId: profile.userId, appCode: CONFIG.APP_CODE });
+          if (s2.status !== 200) throw new Error(s2.message);
+
+          authorizedUser = { lineUserId: profile.userId, firstName: s2.data.firstName, employeeNo: s2.data.employeeNo };
+          showApp();
+        } catch (err) {
+          statusBox.innerHTML = `<span class="text-red-600 font-bold">❌ Error: ${err.message}</span>`;
+          document.getElementById("btnRetry").classList.remove("hidden");
+        }
+      }
+
+      function showApp() {
+        document.getElementById("loginPage").classList.add("hidden");
+        document.getElementById("mainApp").classList.remove("hidden");
+        document.getElementById("officerInfo").innerText = `เจ้าหน้าที่: คุณ${authorizedUser.firstName} (${authorizedUser.employeeNo})`;
+        document.getElementById('arrestDate').valueAsDate = new Date();
+      }
+
+      // Dashboard Logic
+      async function loadDashboard() {
+        try {
+          const res = await fetch(CONFIG.DATA_API_URL + "?action=getData");
+          const result = await res.json();
+          const data = result.data || [];
+          
+          document.getElementById("statsGrid").innerHTML = `
+            <div class="bg-white p-4 rounded-xl shadow text-center"><div class="text-2xl font-bold text-red-600">${data.length}</div><div class="text-xs">จับกุมรวม</div></div>
+            <div class="bg-white p-4 rounded-xl shadow text-center"><div class="text-2xl font-bold text-green-600">${data.filter(d => d.warrantType === 'หมายจับใหม่').length}</div><div class="text-xs">หมายใหม่</div></div>
+          `;
+
+          const types = {};
+          data.forEach(d => types[d.warrantType] = (types[d.warrantType] || 0) + 1);
+          if (pieChart) pieChart.destroy();
+          pieChart = new Chart(document.getElementById('warrantTypeChart'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(types), datasets: [{ data: Object.values(types), backgroundColor: ['#ef4444', '#3b82f6', '#10b981'] }] },
+            options: { maintainAspectRatio: false }
+          });
+
+          document.getElementById("recentRecordsTable").innerHTML = data.slice(-5).reverse().map(r => `
+            <tr class="border-b"><td class="p-2">${r.arrestDate}</td><td class="p-2 font-bold">${r.firstName}</td><td class="p-2">${r.warrantType}</td></tr>
+          `).join('');
+        } catch (err) { console.error("Dashboard error", err); }
+      }
+
+      // Form Submit
+      document.getElementById("arrestForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const status = document.getElementById("formStatus");
+        status.classList.remove("hidden");
+        status.className = "p-4 rounded-xl bg-blue-100 text-blue-700 block";
+        status.innerText = "กำลังบันทึกข้อมูล...";
+
+        const payload = {
+          action: "submit_arrest",
+          arrestDate: document.getElementById("arrestDate").value,
+          arrestUnit: document.getElementById("arrestUnit").value,
+          arrestLocation: document.getElementById("arrestLocation").value,
+          warrantCourt: document.getElementById("warrantCourt").value,
+          warrantNumber: document.getElementById("warrantNumber").value,
+          warrantType: document.getElementById("warrantType").value,
+          charge: document.getElementById("charge").value,
+          firstName: document.getElementById("firstName").value,
+          lastName: document.getElementById("lastName").value,
+          age: document.getElementById("age").value,
+          reporterName: authorizedUser.firstName,
+          reporterId: authorizedUser.employeeNo,
+          lineId: authorizedUser.lineUserId
+        };
+
+        try {
+          const res = await ApiStub.sendRequest(CONFIG.DATA_API_URL, "submit", payload);
+          status.className = "p-4 rounded-xl bg-green-100 text-green-700 block";
+          status.innerText = "✅ บันทึกสำเร็จ!";
+          document.getElementById("arrestForm").reset();
+          setTimeout(() => status.classList.add("hidden"), 3000);
+        } catch (err) { status.className = "p-4 rounded-xl bg-red-100 text-red-700 block"; status.innerText = "❌ " + err.message; }
+      };
+
+      // Tab Events
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          const tab = e.target.id === 'tabRecord' ? 'record' : 'dashboard';
+          document.getElementById("recordSection").classList.toggle("hidden", tab !== 'record');
+          document.getElementById("dashboardSection").classList.toggle("hidden", tab !== 'dashboard');
+          document.getElementById("tabRecord").className = tab === 'record' ? "tab-btn tab-active px-6 py-2 rounded-xl font-medium" : "tab-btn bg-gray-100 px-6 py-2 rounded-xl font-medium";
+          document.getElementById("tabDashboard").className = tab === 'dashboard' ? "tab-btn tab-active px-6 py-2 rounded-xl font-medium" : "tab-btn bg-gray-100 px-6 py-2 rounded-xl font-medium";
+          if (tab === 'dashboard') loadDashboard();
+        };
+      });
+
+      document.getElementById("btnRetry").onclick = () => location.reload();
+      document.addEventListener("DOMContentLoaded", initSSO);
+    })();
+  </script>
+</body>
+</html>
