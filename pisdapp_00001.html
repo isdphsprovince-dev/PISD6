@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PISD6 Movement App</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+    <style>
+        body, html { height: 100%; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .bg-gradient-orange { background: linear-gradient(135deg, #ff8c42 0%, #ff6b35 100%); }
+        .btn-orange { background-color: #ff8c42; transition: all 0.3s ease; }
+        .btn-orange:hover { background-color: #ff6b35; transform: translateY(-2px); }
+        .card-shadow { box-shadow: 0 4px 15px rgba(255, 139, 66, 0.15); }
+        .profile-img { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #ddd; object-fit: cover; margin-bottom: 1rem; }
+        .tab-btn.active { color: #ff8c42; border-bottom: 2px solid #ff8c42; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="app-wrapper w-full h-full overflow-auto">
+        
+        <div id="loginScreen" class="min-h-full bg-gradient-orange flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md text-center">
+                <h2 class="text-2xl font-bold text-orange-600 mb-2">PISD6 Portal</h2>
+                <p id="loadingText" class="text-gray-500 mb-4">กำลังโหลดข้อมูลระบบ...</p>
+                <img id="profileImage" class="profile-img mx-auto hidden" src="" alt="Profile">
+                <h3 id="displayName" class="text-lg font-semibold"></h3>
+                <div id="statusBox" class="text-sm p-4 bg-gray-100 rounded-lg text-left hidden mb-4 border-l-4 border-orange-500"></div>
+                <button id="btnRetry" class="btn-orange text-white px-6 py-2 rounded-lg hidden w-full font-bold">ลองใหม่อีกครั้ง</button>
+            </div>
+        </div>
+
+        <div id="mainApp" class="hidden min-h-full">
+            <div class="bg-gradient-orange text-white p-6 shadow-md">
+                <div class="max-w-7xl mx-auto">
+                    <h1 class="text-2xl font-bold">บันทึกข้อมูลความเคลื่อนไหว</h1>
+                    <p id="reporterInfo" class="text-orange-100 text-sm mt-1 font-medium"></p>
+                </div>
+            </div>
+
+            <div class="bg-white border-b border-gray-200">
+                <div class="max-w-7xl mx-auto px-4 flex gap-6">
+                    <button class="tab-btn active px-4 py-4 font-bold text-gray-500" data-tab="form">บันทึกใหม่</button>
+                    <button class="tab-btn px-4 py-4 font-bold text-gray-500" data-tab="dashboard">แดชบอร์ด</button>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 py-8">
+                <div id="formTab" class="tab-content">
+                    <form id="dataForm" class="bg-white rounded-xl card-shadow p-8 space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-sm font-medium mb-2">วันที่ *</label><input type="date" id="date" required class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-orange-400 outline-none"></div>
+                            <div><label class="block text-sm font-medium mb-2">กลุ่มเคลื่อนไหว *</label><input type="text" id="group" required placeholder="ระบุชื่อกลุ่ม" class="w-full border p-2 rounded-lg"></div>
+                            <div class="md:col-span-2"><label class="block text-sm font-medium mb-2">สถานที่ *</label><input type="text" id="location" required placeholder="สถานที่เกิดเหตุ" class="w-full border p-2 rounded-lg"></div>
+                            <div class="md:col-span-2"><label class="block text-sm font-medium mb-2">เรื่องที่เรียกร้อง *</label><textarea id="demands" required rows="3" class="w-full border p-2 rounded-lg"></textarea></div>
+                            <div><label class="block text-sm font-medium mb-2">จำนวนคน</label><input type="number" id="count" class="w-full border p-2 rounded-lg"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-4">รูปภาพ (สูงสุด 5 รูป)</label>
+                            <div id="imageContainer" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
+                        </div>
+                        <button type="submit" class="btn-orange text-white w-full py-4 rounded-lg font-bold text-lg shadow-lg">บันทึกข้อมูล</button>
+                        <div id="formStatus" class="hidden p-4 rounded-lg text-center font-bold"></div>
+                    </form>
+                </div>
+
+                <div id="dashboardTab" class="tab-content hidden">
+                    <div id="dashboardLoading" class="text-center py-10 text-orange-600 font-bold animate-pulse">กำลังโหลดข้อมูล...</div>
+                    <div id="dashboardContent" class="hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-white rounded-xl card-shadow p-6">
+                                <h3 class="font-bold text-gray-700 mb-4 text-center">สัดส่วนกลุ่มเคลื่อนไหว</h3>
+                                <canvas id="pieChart"></canvas>
+                            </div>
+                            <div class="bg-white rounded-xl card-shadow p-6">
+                                <h3 class="font-bold text-gray-700 mb-4 text-center">สถิติคนรายวัน</h3>
+                                <canvas id="barChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"></div>
+                        <div class="bg-white rounded-xl card-shadow p-6">
+                            <h3 class="font-bold text-gray-700 mb-4 text-center">ข้อมูลล่าสุด</h3>
+                            <div class="overflow-x-auto"><table class="w-full text-sm text-left"><tbody id="dashboardTable"></tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const CONFIG = {
+                LIFF_ID: "2009416313-gtUQHyZ7",
+                SSO_API_URL: "https://script.google.com/macros/s/AKfycbwyI-KJlJzK1kKLkArN5aTgI5mefFJWbNXxvFG8jC011zn49lNAIkmm6BY1FMWYHuP6/exec",
+                DATA_API_URL: "https://script.google.com/macros/s/AKfycbw94pRu7JwSZ9OxIFGFIqNu_M8t64VSkw2i50aEtZRWEs8mIkD_vlHHsmiEq61uPYyG/exec",
+                APP_CODE: "pisdapp_00001"
+            };
+
+            let authorizedUser = null;
+            let dashboardData = [];
+            let pieChart = null, barChart = null;
+
+            const ApiStub = {
+                async sendRequest(url, action, payloadData) {
+                    const payload = { action: action, payload: payloadData };
+                    const response = await fetch(url, {
+                        method: "POST",
+                        body: JSON.stringify(payload),
+                        headers: { "Content-Type": "text/plain;charset=utf-8" }
+                    });
+                    return await response.json();
+                }
+            };
+
+            async function startApp() {
+                const statusBox = document.getElementById("statusBox");
+                try {
+                    statusBox.classList.remove("hidden");
+                    statusBox.innerText = "กำลังเชื่อมต่อ LINE SDK...";
+                    await liff.init({ liffId: CONFIG.LIFF_ID });
+                    if (!liff.isLoggedIn()) { liff.login(); return; }
+
+                    const profile = await liff.getProfile();
+                    document.getElementById("loadingText").style.display = "none";
+                    document.getElementById("profileImage").src = profile.pictureUrl;
+                    document.getElementById("profileImage").classList.remove("hidden");
+                    document.getElementById("displayName").innerText = "สวัสดี, " + profile.displayName;
+
+                    statusBox.innerText = "ยืนยันสิทธิ์ SSO...";
+                    const s1 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "liff_auth", { lineUserId: profile.userId });
+                    if (s1.status !== 200) throw new Error(s1.message);
+
+                    const s2 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "sso_auth", { lineUserId: profile.userId, appCode: CONFIG.APP_CODE });
+                    if (s2.status !== 200) throw new Error(s2.message);
+
+                    authorizedUser = { lineUserId: profile.userId, firstName: s2.data.firstName, employeeNo: s2.data.employeeNo };
+                    document.getElementById("loginScreen").classList.add("hidden");
+                    document.getElementById("mainApp").classList.remove("hidden");
+                    document.getElementById("reporterInfo").innerText = `ผู้รายงาน: คุณ${authorizedUser.firstName} (${authorizedUser.employeeNo})`;
+                    
+                    setupFormUI();
+                } catch (err) {
+                    statusBox.innerHTML = `<span class="text-red-600 font-bold">❌ Error:</span> ${err.message}`;
+                    document.getElementById("btnRetry").classList.remove("hidden");
+                }
+            }
+
+            async function loadDashboard() {
+                document.getElementById("dashboardLoading").classList.remove("hidden");
+                document.getElementById("dashboardContent").classList.add("hidden");
+                try {
+                    // เรียกข้อมูลผ่าน URL เดิม (GET)
+                    const res = await fetch(CONFIG.DATA_API_URL + "?action=getData");
+                    const data = await res.json();
+                    dashboardData = data.records || [];
+                    
+                    updateStatsGrid(dashboardData);
+                    updateCharts(dashboardData);
+                    updateTable(dashboardData);
+
+                    document.getElementById("dashboardLoading").classList.add("hidden");
+                    document.getElementById("dashboardContent").classList.remove("hidden");
+                } catch (err) {
+                    document.getElementById("dashboardLoading").innerText = "❌ ไม่สามารถโหลดข้อมูลได้: " + err.message;
+                }
+            }
+
+            function updateStatsGrid(data) {
+                const stats = [
+                    { label: "จำนวนเรื่อง", val: data.length },
+                    { label: "คนรวม", val: data.reduce((s, r) => s + (parseInt(r.count) || 0), 0) },
+                    { label: "กลุ่ม", val: new Set(data.map(r => r.group)).size },
+                    { label: "สถานที่", val: new Set(data.map(r => r.location)).size }
+                ];
+                document.getElementById("statsGrid").innerHTML = stats.map(s => `
+                    <div class="bg-white rounded-xl card-shadow p-4 text-center">
+                        <div class="text-xl font-bold text-orange-600">${s.val}</div>
+                        <div class="text-[10px] text-gray-400 uppercase">${s.label}</div>
+                    </div>`).join('');
+            }
+
+            function updateCharts(data) {
+                const groups = {};
+                data.forEach(r => groups[r.group] = (groups[r.group] || 0) + 1);
+                if (pieChart) pieChart.destroy();
+                pieChart = new Chart(document.getElementById('pieChart'), {
+                    type: 'doughnut',
+                    data: { labels: Object.keys(groups), datasets: [{ data: Object.values(groups), backgroundColor: ['#ff8c42', '#ff6b35', '#f39c12', '#d35400', '#e67e22'] }] },
+                    options: { plugins: { legend: { position: 'bottom' } } }
+                });
+
+                const dates = {};
+                data.forEach(r => dates[r.date] = (dates[r.date] || 0) + (parseInt(r.count) || 0));
+                const labels = Object.keys(dates).sort().slice(-7);
+                if (barChart) barChart.destroy();
+                barChart = new Chart(document.getElementById('barChart'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'จำนวนคน', data: labels.map(l => dates[l]), backgroundColor: '#ff8c42' }] }
+                });
+            }
+
+            function updateTable(data) {
+                document.getElementById("dashboardTable").innerHTML = data.slice(-10).reverse().map(r => `
+                    <tr class="border-b text-xs"><td class="p-2">${r.date}</td><td class="p-2 font-bold">${r.group}</td><td class="p-2 text-right">${r.count}</td></tr>
+                `).join('');
+            }
+
+            function setupFormUI() {
+                document.getElementById('date').valueAsDate = new Date();
+                const container = document.getElementById('imageContainer');
+                container.innerHTML = '';
+                for (let i = 0; i < 5; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = "border-2 border-dashed border-orange-200 rounded-lg h-24 flex items-center justify-center cursor-pointer relative overflow-hidden bg-orange-50/20";
+                    slot.innerHTML = `<i data-lucide="image-plus" class="text-orange-200"></i><input type="file" accept="image/*" class="hidden"><img class="hidden absolute inset-0 w-full h-full object-cover">`;
+                    slot.onclick = () => slot.querySelector('input').click();
+                    slot.querySelector('input').onchange = (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                                slot.querySelector('img').src = ev.target.result;
+                                slot.querySelector('img').classList.remove('hidden');
+                                slot.querySelector('i').classList.add('hidden');
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    };
+                    container.appendChild(slot);
+                }
+                lucide.createIcons();
+            }
+
+            document.getElementById('dataForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const status = document.getElementById('formStatus');
+                status.classList.remove('hidden');
+                status.className = "p-4 rounded-lg bg-blue-100 text-blue-700 font-bold block";
+                status.innerText = "กำลังส่งข้อมูล...";
+                
+                const payload = {
+                    date: document.getElementById('date').value,
+                    group: document.getElementById('group').value,
+                    location: document.getElementById('location').value,
+                    demands: document.getElementById('demands').value,
+                    count: document.getElementById('count').value || '0',
+                    reporterName: authorizedUser.firstName,
+                    reporterId: authorizedUser.employeeNo,
+                    lineId: authorizedUser.lineUserId,
+                    images: []
+                };
+
+                document.querySelectorAll('#imageContainer img').forEach(img => {
+                    if (img.src && !img.classList.contains('hidden')) payload.images.push(img.src);
+                });
+
+                try {
+                    const res = await ApiStub.sendRequest(CONFIG.DATA_API_URL, "save", payload);
+                    if (res.success) {
+                        status.className = "p-4 rounded-lg bg-green-100 text-green-700 block";
+                        status.innerText = "✅ บันทึกข้อมูลเรียบร้อย!";
+                        document.getElementById('dataForm').reset(); setupFormUI();
+                        setTimeout(() => status.classList.add('hidden'), 3000);
+                    } else throw new Error(res.error);
+                } catch (err) { status.className = "p-4 rounded-lg bg-red-100 text-red-700 block"; status.innerText = "❌ เกิดข้อผิดพลาด: " + err.message; }
+            };
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    const tab = e.target.dataset.tab;
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    e.target.classList.add('active');
+                    document.getElementById(tab + 'Tab').classList.remove('hidden');
+                    if (tab === 'dashboard') loadDashboard();
+                    lucide.createIcons();
+                };
+            });
+
+            document.getElementById("btnRetry").onclick = () => location.reload();
+            document.addEventListener("DOMContentLoaded", startApp);
+        })();
+    </script>
+</body>
+</html>
