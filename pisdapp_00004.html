@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบทะเบียนหนังสือรับ - SSO Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
+    .gradient-header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%); }
+    .card-shadow { box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1); }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 600; }
+    .profile-img { width: 100px; height: 100px; border-radius: 50%; border: 4px solid #fff; object-fit: cover; margin: 0 auto 1.5rem; }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="h-full bg-gradient-to-br from-slate-50 to-blue-50">
+  <div id="app" class="h-full w-full overflow-auto">
+    
+    <div id="loginPage" class="min-h-full flex items-center justify-center p-4 gradient-header">
+      <div class="w-full max-w-md">
+        <div class="bg-white rounded-3xl shadow-2xl p-8 text-center">
+          <h2 class="text-2xl font-bold text-blue-700 mb-2">PISD6 SSO Portal</h2>
+          <p class="text-gray-500 text-sm mb-6">ระบบทะเบียนหนังสือรับ งานสารบรรณ</p>
+          
+          <div id="authFlow">
+            <p id="loadingText" class="text-blue-500 font-semibold animate-pulse">กำลังตรวจสอบสิทธิ์ด้วย LINE...</p>
+            <img id="profileImage" class="profile-img hidden shadow-lg" src="" alt="Profile">
+            <h3 id="displayName" class="text-xl font-bold text-gray-800"></h3>
+            
+            <div id="statusBox" class="hidden mt-4 bg-gray-50 p-4 rounded-2xl text-left text-sm border-l-4 border-blue-500"></div>
+            <button id="btnRetry" class="hidden w-full mt-4 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">ลองใหม่อีกครั้ง</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="mainApp" class="hidden min-h-full flex flex-col">
+      <div id="toast" class="fixed top-4 right-4 z-50 hidden">
+        <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+          <span id="toast-message">บันทึกข้อมูลสำเร็จ</span>
+        </div>
+      </div>
+
+      <header class="gradient-header text-white py-6 px-4 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="bg-white/20 p-3 rounded-full">
+              <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z" /><path d="M8 12h8v2H8zm0 4h8v2H8z" /></svg>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold tracking-wide">ระบบทะเบียนหนังสือรับ</h1>
+              <p id="officerInfo" class="text-blue-100 text-xs md:text-sm font-medium"></p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <nav class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex">
+          <button id="tab-form" class="flex-1 py-4 px-6 text-center tab-active font-bold" onclick="switchTab('form')">บันทึกหนังสือรับ</button>
+          <button id="tab-report" class="flex-1 py-4 px-6 text-center text-gray-500" onclick="switchTab('report')">รายงาน</button>
+        </div>
+      </nav>
+
+      <main id="form-section" class="max-w-4xl mx-auto p-4 md:p-6 tab-content">
+        <div class="bg-white rounded-2xl card-shadow p-6 md:p-8">
+          <h2 class="text-xl font-bold mb-6 pb-4 border-b border-blue-100">แบบฟอร์มลงทะเบียนหนังสือรับ</h2>
+          <form id="document-form" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 mb-2">วันที่รับหนังสือ *</label> <input type="date" id="receive-date" required class="w-full px-4 py-3 border rounded-xl outline-none focus:border-blue-500"></div>
+              <div><label class="block text-sm font-medium text-gray-700 mb-2">เลขทะเบียนรับ *</label> 
+                <div class="flex gap-2"><input type="text" id="reg-number" required readonly class="flex-1 px-4 py-3 border rounded-xl bg-blue-50 text-blue-700 font-bold"><button type="button" onclick="getNextRegNumber()" class="px-3 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200">รับเลขใหม่</button></div>
+              </div>
+            </div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">ที่ (เลขที่หนังสือ) *</label> <input type="text" id="doc-number" required placeholder="ตช 0029.153/..." class="w-full px-4 py-3 border rounded-xl"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">เรื่อง *</label> <textarea id="subject" required rows="2" placeholder="ระบุเรื่องของหนังสือ" class="w-full px-4 py-3 border rounded-xl"></textarea></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">หมายเหตุ (หน่วยงานรับผิดชอบ) *</label> 
+              <select id="remark" required class="w-full px-4 py-3 border rounded-xl bg-white">
+                <option value="">-- เลือกหน่วยงาน --</option>
+                <option value="งานอำนวยการ">งานอำนวยการ</option>
+                <option value="งานการข่าว">งานการข่าว</option>
+                <option value="งานยาเสพติด">งานยาเสพติด</option>
+                <option value="งาน 191">งาน 191</option>
+              </select>
+            </div>
+            <button type="submit" id="submit-btn" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition">บันทึกข้อมูล</button>
+          </form>
+        </div>
+      </main>
+
+      <main id="report-section" class="max-w-6xl mx-auto p-4 md:p-6 tab-content hidden">
+        <div class="bg-white rounded-2xl card-shadow p-6">
+          <h2 class="text-xl font-bold mb-4">รายงานล่าสุด 10 รายการ</h2>
+          <div class="overflow-x-auto"><table class="w-full text-sm text-left"><tbody id="report-tbody"></tbody></table></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // ==========================================
+      // ⚙️ Configurations
+      // ==========================================
+      const CONFIG = {
+        LIFF_ID: "2009416313-96QLhF4s", // LIFF ID ประจำกลุ่ม PISD6
+        SSO_API_URL: "https://script.google.com/macros/s/AKfycbwyI-KJlJzK1kKLkArN5aTgI5mefFJWbNXxvFG8jC011zn49lNAIkmm6BY1FMWYHuP6/exec",
+        DATA_API_URL: "https://script.google.com/macros/s/AKfycbxBkgzYAVZBscDlrU8kFbDIIA3qaWwqvNAnHqUh5VY6_WM7DqAjqEqv_bjw4SWlh9iTwg/exec",
+        APP_CODE: "pisdapp_00004"
+      };
+
+      let authorizedUser = null;
+      let reportData = [];
+
+      const ApiStub = {
+        async sendRequest(url, action, payloadData) {
+          const payload = { action, payload: payloadData };
+          const response = await fetch(url, {
+            method: "POST",
+            body: JSON.stringify(payload),
+            headers: { "Content-Type": "text/plain;charset=utf-8" } // ป้องกัน CORS
+          });
+          return await response.json();
+        }
+      };
+
+      // ==========================================
+      // 🔐 SSO Core Logic
+      // ==========================================
+      async function startSSO() {
+        const statusBox = document.getElementById("statusBox");
+        try {
+          statusBox.classList.remove("hidden");
+          statusBox.innerText = "กำลังตรวจสอบตัวตน LINE...";
+          
+          await liff.init({ liffId: CONFIG.LIFF_ID });
+          if (!liff.isLoggedIn()) { liff.login(); return; }
+
+          const profile = await liff.getProfile();
+          document.getElementById("loadingText").classList.add("hidden");
+          document.getElementById("profileImage").src = profile.pictureUrl;
+          document.getElementById("profileImage").classList.remove("hidden");
+          document.getElementById("displayName").innerText = "สวัสดี, " + profile.displayName;
+
+          statusBox.innerText = "กำลังยืนยันสิทธิ์ SSO (Step 1)...";
+          const res1 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "liff_auth", { lineUserId: profile.userId });
+          if (res1.status !== 200) throw new Error(res1.message);
+
+          statusBox.innerText = "กำลังตรวจสอบสิทธิ์แอป (Step 2)...";
+          const res2 = await ApiStub.sendRequest(CONFIG.SSO_API_URL, "sso_auth", { lineUserId: profile.userId, appCode: CONFIG.APP_CODE });
+          if (res2.status !== 200) throw new Error(res2.message);
+
+          // ผ่านการตรวจสอบสิทธิ์
+          authorizedUser = { lineUserId: profile.userId, firstName: res2.data.firstName, employeeNo: res2.data.employeeNo };
+          
+          document.getElementById("loginPage").classList.add("hidden");
+          document.getElementById("mainApp").classList.remove("hidden");
+          document.getElementById("officerInfo").innerText = `เจ้าหน้าที่: คุณ${authorizedUser.firstName} (${authorizedUser.employeeNo})`;
+          
+          initApp();
+        } catch (err) {
+          statusBox.innerHTML = `<span class="text-red-600 font-bold">❌ Error:</span> ${err.message}`;
+          document.getElementById("btnRetry").classList.remove("hidden");
+        }
+      }
+
+      // ==========================================
+      // 📊 Main App Logic
+      // ==========================================
+      function initApp() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('receive-date').value = today;
+        getNextRegNumber();
+        document.getElementById('document-form').addEventListener('submit', handleFormSubmit);
+      }
+
+      async function getNextRegNumber() {
+        try {
+          const res = await fetch(`${CONFIG.DATA_API_URL}?action=getLastRegNumber`).then(r => r.json());
+          if (res.success) {
+            const nextNum = (res.lastRegNumber || 0) + 1;
+            document.getElementById('reg-number').value = nextNum;
+          }
+        } catch (e) { console.error("Load Reg Number Fail", e); }
+      }
+
+      async function handleFormSubmit(e) {
+        e.preventDefault();
+        const btn = document.getElementById("submit-btn");
+        btn.disabled = true;
+        btn.innerText = "กำลังบันทึก...";
+
+        const payload = {
+          receiveDate: document.getElementById('receive-date').value,
+          regNumber: document.getElementById('reg-number').value,
+          docNumber: document.getElementById('doc-number').value,
+          remark: document.getElementById('remark').value,
+          subject: document.getElementById('subject').value,
+          // ข้อมูลจาก SSO
+          reporterName: authorizedUser.firstName,
+          reporterId: authorizedUser.employeeNo,
+          lineId: authorizedUser.lineUserId
+        };
+
+        try {
+          const res = await ApiStub.sendRequest(CONFIG.DATA_API_URL, "save", payload);
+          if (res.success) {
+            showToast("บันทึกข้อมูลเรียบร้อยแล้ว");
+            document.getElementById('document-form').reset();
+            getNextRegNumber();
+          } else throw new Error(res.message);
+        } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); }
+        finally { btn.disabled = false; btn.innerText = "บันทึกข้อมูล"; }
+      }
+
+      window.switchTab = (tab) => {
+        document.getElementById('form-section').classList.toggle('hidden', tab !== 'form');
+        document.getElementById('report-section').classList.toggle('hidden', tab !== 'report');
+        document.getElementById('tab-form').classList.toggle('tab-active', tab === 'form');
+        document.getElementById('tab-report').classList.toggle('tab-active', tab === 'report');
+        if (tab === 'report') loadReportData();
+      };
+
+      async function loadReportData() {
+        const tbody = document.getElementById("report-tbody");
+        tbody.innerHTML = '<tr><td class="p-4 text-center">กำลังโหลด...</td></tr>';
+        try {
+          const res = await fetch(`${CONFIG.DATA_API_URL}?action=getReport`).then(r => r.json());
+          if (res.success && res.data) {
+            tbody.innerHTML = res.data.slice(0, 10).map((r, i) => `
+              <tr class="border-b">
+                <td class="p-3">${r.regNumber}</td><td class="p-3 font-bold">${r.subject}</td><td class="p-3 text-right">${r.remark}</td>
+              </tr>
+            `).join('');
+          }
+        } catch (e) { tbody.innerHTML = '<tr><td class="p-4 text-red-500">โหลดข้อมูลไม่สำเร็จ</td></tr>'; }
+      }
+
+      function showToast(msg) {
+        const toast = document.getElementById("toast");
+        document.getElementById("toast-message").innerText = msg;
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 3000);
+      }
+
+      document.getElementById("btnRetry").onclick = () => location.reload();
+      document.addEventListener("DOMContentLoaded", startSSO);
+    })();
+  </script>
+</body>
+</html>
